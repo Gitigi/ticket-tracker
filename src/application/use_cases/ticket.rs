@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use uuid::Uuid;
 
 use crate::{
     application::{
@@ -13,8 +14,8 @@ use crate::{
 #[async_trait]
 pub trait TicketPersistence: Send + Sync {
     async fn create(&self, ticket: &CreateTicket) -> AppResult<domain::Ticket>;
-    async fn update(&self, ticket: UpdateTicket) -> AppResult<()>;
-    async fn get(&self, id: u64) -> AppResult<domain::Ticket>;
+    async fn update(&self, id: Uuid, ticket: UpdateTicket) -> AppResult<()>;
+    async fn get(&self, id: Uuid) -> AppResult<domain::Ticket>;
     async fn list(&self, query: &ListTicket) -> AppResult<Vec<domain::Ticket>>;
 }
 
@@ -37,22 +38,28 @@ impl TicketUseCases {
         self.persistence.list(&query).await
     }
 
-    pub async fn update_status(&self, status: TicketStatus) -> AppResult<()> {
+    pub async fn update_status(&self, id: Uuid, status: TicketStatus) -> AppResult<()> {
         self.persistence
-            .update(UpdateTicket {
-                status: Some(status),
-                ..Default::default()
-            })
+            .update(
+                id,
+                UpdateTicket {
+                    status: Some(status),
+                    ..Default::default()
+                },
+            )
             .await?;
         Ok(())
     }
 
-    pub async fn update_priority(&self, priority: TicketPriority) -> AppResult<()> {
+    pub async fn update_priority(&self, id: Uuid, priority: TicketPriority) -> AppResult<()> {
         self.persistence
-            .update(UpdateTicket {
-                priority: Some(priority),
-                ..Default::default()
-            })
+            .update(
+                id,
+                UpdateTicket {
+                    priority: Some(priority),
+                    ..Default::default()
+                },
+            )
             .await?;
         Ok(())
     }
