@@ -24,6 +24,20 @@ pub struct ListTicket {
     pub limit: Option<u64>,
 }
 
+impl ListTicket {
+    /// Rows to skip for the requested page. Pages are 1-based; without a `limit` nothing is skipped.
+    pub fn offset(&self) -> u64 {
+        match self.limit {
+            Some(limit) => self
+                .page
+                .unwrap_or(1)
+                .saturating_sub(1)
+                .saturating_mul(limit),
+            None => 0,
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct TicketStats {
     pub open: u64,

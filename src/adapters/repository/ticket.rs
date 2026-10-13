@@ -1,67 +1,159 @@
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::NaiveDateTime;
 use uuid::Uuid;
 
 use crate::{
-    adapters::repository::MemoryRepository,
+    adapters::repository::PostgresRepository,
     application::{AppResult, TicketRepository, app_error::AppError, dto},
-    domain,
+    domain::{self, TicketPriority, TicketStatus},
 };
 
+struct TicketRow {
+    id: Uuid,
+    title: String,
+    description: Option<String>,
+    status: String,
+    priority: String,
+    created_at: NaiveDateTime,
+}
+
 #[async_trait]
-impl TicketRepository for MemoryRepository {
+impl TicketRepository for PostgresRepository {
     async fn create(&self, ticket: &dto::CreateTicket) -> AppResult<domain::Ticket> {
-        let ticket = domain::Ticket {
-            id: uuid::Uuid::now_v7(),
-            title: ticket.title.clone(),
-            description: ticket.description.clone(),
-            status: domain::TicketStatus::Open,
-            priority: ticket.priority,
-            created_at: Utc::now().naive_utc(),
-        };
+        let row = sqlx::query_as!(
+            TicketRow,
+            r#"
+            INSERT INTO tickets (id, title, description, status, priority)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, title, description, status, priority, created_at
+            "#,
+            Uuid::now_v7(),
+            ticket.title,
+            ticket.description,
+            status_to_db(TicketStatus::Open),
+            priority_to_db(ticket.priority),
+        )
+        .fetch_one(&self.pool)
+        .await?;
 
-        let mut lock = self.tickets.write().expect("mutex poisoned");
-
-        lock.push(ticket.clone());
-
-        Ok(ticket)
+        row.try_into()
     }
     async fn update(&self, id: Uuid, update: dto::UpdateTicket) -> AppResult<()> {
-        let mut lock = self.tickets.write().unwrap();
-        let Some(ticket) = lock.iter_mut().find(|ticket| ticket.id == id) else {
+        let result = sqlx::query!(
+            r#"
+            UPDATE tickets
+            SET title = COALESCE($2, title),
+                description = COALESCE($3, description),
+                status = COALESCE($4, status),
+                priority = COALESCE($5, priority)
+            WHERE id = $1
+            "#,
+            id,
+            update.title,
+            update.description,
+            update.status.map(status_to_db),
+            update.priority.map(priority_to_db),
+        )
+        .execute(&self.pool)
+        .await?;
+
+        if result.rows_affected() == 0 {
             return Err(AppError::Database("ticket not found".into()));
-        };
-        if let Some(title) = update.title {
-            ticket.title = title;
-        }
-        if let Some(description) = update.description {
-            ticket.description = Some(description);
-        }
-        if let Some(status) = update.status {
-            ticket.status = status;
-        }
-        if let Some(priority) = update.priority {
-            ticket.priority = priority;
         }
         Ok(())
     }
     async fn get(&self, id: Uuid) -> AppResult<domain::Ticket> {
-        let lock = self.tickets.read().unwrap();
-        let Some(ticket) = lock.iter().find(|ticket| ticket.id == id) else {
+        let row = sqlx::query_as!(
+            TicketRow,
+            r#"
+            SELECT id, title, description, status, priority, created_at
+            FROM tickets
+            WHERE id = $1
+            "#,
+            id,
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some(row) = row else {
             return Err(AppError::Database("ticket not found".into()));
         };
-        Ok(ticket.clone())
+        row.try_into()
     }
     async fn list(&self, query: &dto::ListTicket) -> AppResult<Vec<domain::Ticket>> {
-        let lock = self.tickets.read().unwrap();
-        let tickets = if let Some(status) = query.status {
-            lock.iter()
-                .filter(|ticket| ticket.status == status)
-                .cloned()
-                .collect()
-        } else {
-            lock.clone()
-        };
-        Ok(tickets)
+        let rows = sqlx::query_as!(
+            TicketRow,
+            r#"
+            SELECT id, title, description, status, priority, created_at
+            FROM tickets
+            WHERE $1::text IS NULL OR status = $1
+            ORDER BY created_at
+            LIMIT $2 OFFSET $3
+            "#,
+            query.status.map(status_to_db),
+            query.limit.map(to_i64),
+            to_i64(query.offset()),
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter().map(TryInto::try_into).collect()
     }
+}
+
+impl TryFrom<TicketRow> for domain::Ticket {
+    type Error = AppError;
+
+    fn try_from(row: TicketRow) -> AppResult<Self> {
+        Ok(domain::Ticket {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            status: status_from_db(&row.status)?,
+            priority: priority_from_db(&row.priority)?,
+            created_at: row.created_at,
+        })
+    }
+}
+
+fn status_to_db(status: TicketStatus) -> &'static str {
+    match status {
+        TicketStatus::Open => "open",
+        TicketStatus::InProgress => "in_progress",
+        TicketStatus::Closed => "closed",
+    }
+}
+
+fn status_from_db(status: &str) -> AppResult<TicketStatus> {
+    match status {
+        "open" => Ok(TicketStatus::Open),
+        "in_progress" => Ok(TicketStatus::InProgress),
+        "closed" => Ok(TicketStatus::Closed),
+        other => Err(AppError::Database(format!(
+            "unknown ticket status: {other}"
+        ))),
+    }
+}
+
+fn priority_to_db(priority: TicketPriority) -> &'static str {
+    match priority {
+        TicketPriority::Low => "low",
+        TicketPriority::Medium => "medium",
+        TicketPriority::High => "high",
+    }
+}
+
+fn priority_from_db(priority: &str) -> AppResult<TicketPriority> {
+    match priority {
+        "low" => Ok(TicketPriority::Low),
+        "medium" => Ok(TicketPriority::Medium),
+        "high" => Ok(TicketPriority::High),
+        other => Err(AppError::Database(format!(
+            "unknown ticket priority: {other}"
+        ))),
+    }
+}
+
+fn to_i64(value: u64) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
 }

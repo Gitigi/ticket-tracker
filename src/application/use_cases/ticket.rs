@@ -82,6 +82,6 @@ impl TicketUseCases {
             TicketStatus::InProgress => stat.in_progress += 1,
             TicketStatus::Closed => stat.closed += 1,
         });
-        todo!()
+        Ok(stat)
     }
 }

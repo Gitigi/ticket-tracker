@@ -2,6 +2,8 @@ use ticket_tracker::infra::{app::create_app, setup::init_app_state};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
+
     let app_state = init_app_state().await?;
 
     let app = create_app(app_state);
