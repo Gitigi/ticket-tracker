@@ -7,7 +7,7 @@ use crate::adapters::{self, http::app_state::AppState};
 pub fn create_app(app_state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(
-            "http://localhost:5173"
+            "http://localhost:3000"
                 .parse::<http::HeaderValue>()
                 .unwrap(),
         )
