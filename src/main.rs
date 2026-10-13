@@ -1,39 +1,18 @@
-use std::sync::Arc;
-
-use ticket_tracker::{
-    adapters::repository::MemoryRepository,
-    application::{TicketUseCases, dto::CreateTicket},
-    domain,
-};
+use ticket_tracker::infra::{app::create_app, setup::init_app_state};
 
 #[tokio::main]
-async fn main() {
-    let memory = MemoryRepository::new();
-    let use_case = TicketUseCases::new(Arc::new(memory));
-    println!(
-        "tickets {:?}",
-        use_case.list_tickets(Default::default()).await
-    );
-    let ticket = use_case
-        .create(CreateTicket {
-            title: "Assignment".into(),
-            description: Some("Finish my assignment".into()),
-            priority: domain::TicketPriority::Low,
-        })
-        .await
-        .unwrap();
-    println!(
-        "tickets {:?}",
-        use_case.list_tickets(Default::default()).await
-    );
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let app_state = init_app_state().await?;
 
-    use_case
-        .update_priority(ticket.id, domain::TicketPriority::High)
+    let app = create_app(app_state);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3001")
         .await
         .unwrap();
 
-    println!(
-        "tickets {:?}",
-        use_case.list_tickets(Default::default()).await
-    );
+    println!("Backend listening at {}", &listener.local_addr().unwrap());
+
+    axum::serve(listener, app).await.unwrap();
+
+    Ok(())
 }

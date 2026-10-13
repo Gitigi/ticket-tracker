@@ -5,7 +5,11 @@ edition = "2024"
 
 [dependencies]
 async-trait = "0.1.92"
-chrono = "0.4.45"
+axum = "0.8.9"
+axum-extra = { version = "0.10", features = ["cookie"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 thiserror = "2.0.21"
 tokio = { version = "1.53.2", features = ["full"] }
-uuid = { version = "1.28.0", features = ["v7"] }
+uuid = { version = "1.28.0", features = ["v7", "serde"] }
+serde = { version = "1.0", features = ["derive"] }
+tower-http = { version = "0.6", features = ["cors"] }

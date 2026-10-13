@@ -1,8 +1,9 @@
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::domain::values::{TicketPriority, TicketStatus};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Ticket {
     pub id: Uuid,
     pub title: String,
