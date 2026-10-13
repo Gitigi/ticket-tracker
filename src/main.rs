@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use ticket_tracker::{
-    adapter::persistence::MemoryPersistance,
+    adapters::repository::MemoryRepository,
     application::{TicketUseCases, dto::CreateTicket},
     domain,
 };
 
 #[tokio::main]
 async fn main() {
-    let memory = MemoryPersistance::new();
+    let memory = MemoryRepository::new();
     let use_case = TicketUseCases::new(Arc::new(memory));
     println!(
         "tickets {:?}",

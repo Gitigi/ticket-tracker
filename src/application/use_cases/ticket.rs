@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[async_trait]
-pub trait TicketPersistence: Send + Sync {
+pub trait TicketRepository: Send + Sync {
     async fn create(&self, ticket: &CreateTicket) -> AppResult<domain::Ticket>;
     async fn update(&self, id: Uuid, ticket: UpdateTicket) -> AppResult<()>;
     async fn get(&self, id: Uuid) -> AppResult<domain::Ticket>;
@@ -21,11 +21,11 @@ pub trait TicketPersistence: Send + Sync {
 
 #[derive(Clone)]
 pub struct TicketUseCases {
-    persistence: Arc<dyn TicketPersistence>,
+    persistence: Arc<dyn TicketRepository>,
 }
 
 impl TicketUseCases {
-    pub fn new(persistence: Arc<dyn TicketPersistence>) -> Self {
+    pub fn new(persistence: Arc<dyn TicketRepository>) -> Self {
         Self { persistence }
     }
 
@@ -34,8 +34,18 @@ impl TicketUseCases {
         Ok(ticket)
     }
 
+    pub async fn ticket(&self, id: Uuid) -> AppResult<domain::Ticket> {
+        let ticket = self.persistence.get(id).await?;
+        Ok(ticket)
+    }
+
     pub async fn list_tickets(&self, query: ListTicket) -> AppResult<Vec<domain::Ticket>> {
         self.persistence.list(&query).await
+    }
+
+    pub async fn update(&self, id: Uuid, payload: UpdateTicket) -> AppResult<()> {
+        self.persistence.update(id, payload).await?;
+        Ok(())
     }
 
     pub async fn update_status(&self, id: Uuid, status: TicketStatus) -> AppResult<()> {
