@@ -21,35 +21,35 @@ pub trait TicketRepository: Send + Sync {
 
 #[derive(Clone)]
 pub struct TicketUseCases {
-    persistence: Arc<dyn TicketRepository>,
+    repository: Arc<dyn TicketRepository>,
 }
 
 impl TicketUseCases {
-    pub fn new(persistence: Arc<dyn TicketRepository>) -> Self {
-        Self { persistence }
+    pub fn new(repository: Arc<dyn TicketRepository>) -> Self {
+        Self { repository }
     }
 
     pub async fn create(&self, ticket: CreateTicket) -> AppResult<domain::Ticket> {
-        let ticket = self.persistence.create(&ticket).await?;
+        let ticket = self.repository.create(&ticket).await?;
         Ok(ticket)
     }
 
     pub async fn ticket(&self, id: Uuid) -> AppResult<domain::Ticket> {
-        let ticket = self.persistence.get(id).await?;
+        let ticket = self.repository.get(id).await?;
         Ok(ticket)
     }
 
     pub async fn list_tickets(&self, query: ListTicket) -> AppResult<Vec<domain::Ticket>> {
-        self.persistence.list(&query).await
+        self.repository.list(&query).await
     }
 
     pub async fn update(&self, id: Uuid, payload: UpdateTicket) -> AppResult<()> {
-        self.persistence.update(id, payload).await?;
+        self.repository.update(id, payload).await?;
         Ok(())
     }
 
     pub async fn update_status(&self, id: Uuid, status: TicketStatus) -> AppResult<()> {
-        self.persistence
+        self.repository
             .update(
                 id,
                 UpdateTicket {
@@ -62,7 +62,7 @@ impl TicketUseCases {
     }
 
     pub async fn update_priority(&self, id: Uuid, priority: TicketPriority) -> AppResult<()> {
-        self.persistence
+        self.repository
             .update(
                 id,
                 UpdateTicket {
@@ -75,7 +75,7 @@ impl TicketUseCases {
     }
 
     pub async fn stats(&self) -> AppResult<TicketStats> {
-        let tickets = self.persistence.list(&Default::default()).await?;
+        let tickets = self.repository.list(&Default::default()).await?;
         let mut stat = dto::TicketStats::default();
         tickets.iter().for_each(|ticket| match ticket.status {
             TicketStatus::Open => stat.open += 1,
