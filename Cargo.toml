@@ -1,6 +1,10 @@
 [package]
-name = "ticketing"
+name = "ticket-tracker"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+async-trait = "0.1.92"
+chrono = "0.4.45"
+thiserror = "2.0.21"
+uuid = { version = "1.28.0", features = ["v7"] }
