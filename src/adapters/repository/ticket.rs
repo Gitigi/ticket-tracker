@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
@@ -8,7 +9,8 @@ use crate::{
     domain::{self, TicketPriority, TicketStatus},
 };
 
-struct TicketRow {
+#[derive(sqlx::FromRow, Debug, Serialize)]
+struct TicketDb {
     id: Uuid,
     title: String,
     description: Option<String>,
@@ -21,7 +23,7 @@ struct TicketRow {
 impl TicketRepository for PostgresRepository {
     async fn create(&self, ticket: &dto::CreateTicket) -> AppResult<domain::Ticket> {
         let row = sqlx::query_as!(
-            TicketRow,
+            TicketDb,
             r#"
             INSERT INTO tickets (id, title, description, status, priority)
             VALUES ($1, $2, $3, $4, $5)
@@ -64,7 +66,7 @@ impl TicketRepository for PostgresRepository {
     }
     async fn get(&self, id: Uuid) -> AppResult<domain::Ticket> {
         let row = sqlx::query_as!(
-            TicketRow,
+            TicketDb,
             r#"
             SELECT id, title, description, status, priority, created_at
             FROM tickets
@@ -82,7 +84,7 @@ impl TicketRepository for PostgresRepository {
     }
     async fn list(&self, query: &dto::ListTicket) -> AppResult<Vec<domain::Ticket>> {
         let rows = sqlx::query_as!(
-            TicketRow,
+            TicketDb,
             r#"
             SELECT id, title, description, status, priority, created_at
             FROM tickets
@@ -101,10 +103,10 @@ impl TicketRepository for PostgresRepository {
     }
 }
 
-impl TryFrom<TicketRow> for domain::Ticket {
+impl TryFrom<TicketDb> for domain::Ticket {
     type Error = AppError;
 
-    fn try_from(row: TicketRow) -> AppResult<Self> {
+    fn try_from(row: TicketDb) -> AppResult<Self> {
         Ok(domain::Ticket {
             id: row.id,
             title: row.title,
