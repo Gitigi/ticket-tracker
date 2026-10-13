@@ -1,0 +1,13 @@
+# Development image for the web app: Vite dev server with hot reload.
+# Source is bind-mounted at runtime (see docker-compose.yml); dependencies are installed in the image
+# so native binaries match Linux rather than the host OS.
+FROM node:24-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

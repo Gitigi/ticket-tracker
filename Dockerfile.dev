@@ -1,0 +1,14 @@
+# Development image for the API: rebuilds and restarts on source changes.
+# Source is bind-mounted at runtime (see docker-compose.yml), so only tooling lives in the image.
+FROM rust:1-slim-bookworm
+
+RUN cargo install --locked watchexec-cli
+
+WORKDIR /app
+
+# Keep build artifacts out of the bind mount (faster on macOS, no clash with the host's target/).
+ENV CARGO_TARGET_DIR=/cargo-target
+
+EXPOSE 3001
+
+CMD ["watchexec", "--restart", "--exts", "rs,toml,sql", "--watch", "src", "--watch", "migrations", "--watch", "Cargo.toml", "--", "cargo", "run"]
