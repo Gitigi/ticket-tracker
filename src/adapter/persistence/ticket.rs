@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{NaiveDateTime, Utc};
+use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
@@ -53,7 +53,15 @@ impl TicketPersistence for MemoryPersistance {
         Ok(ticket.clone())
     }
     async fn list(&self, query: &dto::ListTicket) -> AppResult<Vec<domain::Ticket>> {
-        let tickets = self.tickets.read().unwrap().clone();
+        let lock = self.tickets.read().unwrap();
+        let tickets = if let Some(status) = query.status {
+            lock.iter()
+                .filter(|ticket| ticket.status == status)
+                .cloned()
+                .collect()
+        } else {
+            lock.clone()
+        };
         Ok(tickets)
     }
 }
